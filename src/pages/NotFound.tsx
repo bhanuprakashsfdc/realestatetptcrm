@@ -1,7 +1,7 @@
 
 import { useLocation, Link } from "react-router-dom";
 import { useEffect } from "react";
-import { building, MapPin, ArrowLeft, Search } from "lucide-react";
+import { Building, MapPin, ArrowLeft, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const NotFound = () => {
@@ -21,7 +21,7 @@ const NotFound = () => {
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-purple-600 rounded-full blur-3xl opacity-20 animate-pulse"></div>
           <div className="relative bg-white rounded-3xl p-8 shadow-2xl border border-purple-100">
-            <building className="w-24 h-24 mx-auto text-purple-600 animate-bounce" />
+            <Building className="w-24 h-24 mx-auto text-purple-600 animate-bounce" />
           </div>
         </div>
 
@@ -61,7 +61,7 @@ const NotFound = () => {
           </Link>
           <Link to="/properties">
             <Button variant="outline" className="border-purple-200 text-purple-700 hover:bg-purple-50 px-8 py-3 rounded-xl transition-all duration-300 hover:scale-105">
-              <building className="w-4 h-4 mr-2" />
+              <Building className="w-4 h-4 mr-2" />
               Browse Properties
             </Button>
           </Link>
