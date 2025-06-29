@@ -18,8 +18,8 @@ const leadSchema = z.object({
   location: z.string().optional(),
   status: z.string().optional(),
   source: z.string().optional(),
-  budget_min: z.number().optional(),
-  budget_max: z.number().optional(),
+  budget_min: z.number().optional().nullable(),
+  budget_max: z.number().optional().nullable(),
   notes: z.string().optional(),
 });
 
@@ -43,14 +43,29 @@ export const LeadForm = ({ initialData, onSubmit, onCancel, isLoading }: LeadFor
       location: initialData?.location || '',
       status: initialData?.status || 'new',
       source: initialData?.source || '',
-      budget_min: initialData?.budget_min || undefined,
-      budget_max: initialData?.budget_max || undefined,
+      budget_min: initialData?.budget_min || null,
+      budget_max: initialData?.budget_max || null,
       notes: initialData?.notes || '',
     },
   });
 
   const handleSubmit = (data: LeadFormData) => {
-    onSubmit(data);
+    // Clean up the data before submitting
+    const cleanedData = {
+      ...data,
+      email: data.email || null,
+      phone: data.phone || null,
+      property_type: data.property_type || null,
+      location: data.location || null,
+      status: data.status || 'new',
+      source: data.source || null,
+      budget_min: data.budget_min || null,
+      budget_max: data.budget_max || null,
+      notes: data.notes || null,
+    };
+    
+    console.log('Form submitted with data:', cleanedData);
+    onSubmit(cleanedData);
   };
 
   return (
@@ -192,7 +207,8 @@ export const LeadForm = ({ initialData, onSubmit, onCancel, isLoading }: LeadFor
                     type="number" 
                     placeholder="0" 
                     {...field}
-                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                    value={field.value || ''}
                   />
                 </FormControl>
                 <FormMessage />
@@ -211,7 +227,8 @@ export const LeadForm = ({ initialData, onSubmit, onCancel, isLoading }: LeadFor
                     type="number" 
                     placeholder="0" 
                     {...field}
-                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                    value={field.value || ''}
                   />
                 </FormControl>
                 <FormMessage />
