@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DashboardSidebar } from '@/components/layout/DashboardSidebar';
@@ -7,17 +6,29 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { 
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { Plus, Phone, Mail, Eye, Edit } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { LeadModal } from '@/components/leads/LeadModal';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
+const ITEMS_PER_PAGE = 9;
+
 const LeadsList = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [selectedLead, setSelectedLead] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -25,15 +36,19 @@ const LeadsList = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
-  // Fetch leads from Supabase
-  const { data: leads = [], isLoading } = useQuery({
-    queryKey: ['leads'],
+  // Fetch leads with pagination from Supabase
+  const { data: leadsData, isLoading } = useQuery({
+    queryKey: ['leads', currentPage],
     queryFn: async () => {
       console.log('Fetching leads from Supabase...');
-      const { data, error } = await supabase
+      const from = (currentPage - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+      
+      const { data, error, count } = await supabase
         .from('leads')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to);
       
       if (error) {
         console.error('Error fetching leads:', error);
@@ -41,9 +56,16 @@ const LeadsList = () => {
       }
       
       console.log('Fetched leads:', data);
-      return data || [];
+      return {
+        leads: data || [],
+        totalCount: count || 0
+      };
     },
   });
+
+  const leads = leadsData?.leads || [];
+  const totalCount = leadsData?.totalCount || 0;
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
   // Create lead mutation
   const createLeadMutation = useMutation({
@@ -161,6 +183,10 @@ const LeadsList = () => {
     setSelectedLead(null);
   };
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex">
@@ -210,92 +236,166 @@ const LeadsList = () => {
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                {leads.map((lead) => (
-                  <Card key={lead.id} className="shadow-sm hover:shadow-md transition-shadow duration-200">
-                    <CardContent className="p-4 sm:p-6">
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="w-10 h-10 sm:w-12 sm:h-12">
-                            <AvatarFallback className="bg-landify-blue text-white text-sm">
-                              {lead.name?.split(' ').map((n: string) => n[0]).join('') || 'L'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-gray-900 truncate">{lead.name}</h3>
-                            <Badge className={getStatusColor(lead.status)}>
-                              {lead.status || 'New'}
-                            </Badge>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
+                  {leads.map((lead) => (
+                    <Card key={lead.id} className="shadow-sm hover:shadow-md transition-shadow duration-200">
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-10 h-10 sm:w-12 sm:h-12">
+                              <AvatarFallback className="bg-landify-blue text-white text-sm">
+                                {lead.name?.split(' ').map((n: string) => n[0]).join('') || 'L'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-gray-900 truncate">{lead.name}</h3>
+                              <Badge className={getStatusColor(lead.status)}>
+                                {lead.status || 'New'}
+                              </Badge>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditLead(lead)}
+                              className="flex-shrink-0"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditLead(lead)}
-                            className="flex-shrink-0"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </div>
 
-                        <div className="space-y-2">
-                          {lead.email && (
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <Mail className="w-4 h-4 flex-shrink-0" />
-                              <span className="truncate">{lead.email}</span>
-                            </div>
-                          )}
-                          {lead.phone && (
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <Phone className="w-4 h-4 flex-shrink-0" />
-                              <span className="truncate">{lead.phone}</span>
-                            </div>
-                          )}
-                        </div>
+                          <div className="space-y-2">
+                            {lead.email && (
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Mail className="w-4 h-4 flex-shrink-0" />
+                                <span className="truncate">{lead.email}</span>
+                              </div>
+                            )}
+                            {lead.phone && (
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Phone className="w-4 h-4 flex-shrink-0" />
+                                <span className="truncate">{lead.phone}</span>
+                              </div>
+                            )}
+                          </div>
 
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          {lead.source && (
-                            <div>
-                              <span className="text-gray-500">Source:</span>
-                              <p className="font-medium truncate">{lead.source}</p>
-                            </div>
-                          )}
-                          {lead.property_type && (
-                            <div>
-                              <span className="text-gray-500">Type:</span>
-                              <p className="font-medium truncate">{lead.property_type}</p>
-                            </div>
-                          )}
-                          {(lead.budget_min || lead.budget_max) && (
-                            <div className="col-span-2">
-                              <span className="text-gray-500">Budget:</span>
-                              <p className="font-medium">
-                                {lead.budget_min && lead.budget_max ? 
-                                  `$${(lead.budget_min / 1000000).toFixed(1)}M - $${(lead.budget_max / 1000000).toFixed(1)}M` :
-                                  lead.budget_min ? `From $${(lead.budget_min / 1000000).toFixed(1)}M` :
-                                  lead.budget_max ? `Up to $${(lead.budget_max / 1000000).toFixed(1)}M` : ''
-                                }
-                              </p>
-                            </div>
-                          )}
-                          {lead.location && (
-                            <div className="col-span-2">
-                              <span className="text-gray-500">Location:</span>
-                              <p className="font-medium truncate">{lead.location}</p>
-                            </div>
-                          )}
-                        </div>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            {lead.source && (
+                              <div>
+                                <span className="text-gray-500">Source:</span>
+                                <p className="font-medium truncate">{lead.source}</p>
+                              </div>
+                            )}
+                            {lead.property_type && (
+                              <div>
+                                <span className="text-gray-500">Type:</span>
+                                <p className="font-medium truncate">{lead.property_type}</p>
+                              </div>
+                            )}
+                            {(lead.budget_min || lead.budget_max) && (
+                              <div className="col-span-2">
+                                <span className="text-gray-500">Budget:</span>
+                                <p className="font-medium">
+                                  {lead.budget_min && lead.budget_max ? 
+                                    `$${(lead.budget_min / 1000000).toFixed(1)}M - $${(lead.budget_max / 1000000).toFixed(1)}M` :
+                                    lead.budget_min ? `From $${(lead.budget_min / 1000000).toFixed(1)}M` :
+                                    lead.budget_max ? `Up to $${(lead.budget_max / 1000000).toFixed(1)}M` : ''
+                                  }
+                                </p>
+                              </div>
+                            )}
+                            {lead.location && (
+                              <div className="col-span-2">
+                                <span className="text-gray-500">Location:</span>
+                                <p className="font-medium truncate">{lead.location}</p>
+                              </div>
+                            )}
+                          </div>
 
-                        <Link to={`/leads/${lead.id}`}>
-                          <Button variant="outline" className="w-full">
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
-                          </Button>
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                          <Link to={`/leads/${lead.id}`}>
+                            <Button variant="outline" className="w-full">
+                              <Eye className="w-4 h-4 mr-2" />
+                              View Details
+                            </Button>
+                          </Link>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex justify-center">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                            className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                        
+                        {/* First page */}
+                        {currentPage > 3 && (
+                          <>
+                            <PaginationItem>
+                              <PaginationLink onClick={() => handlePageChange(1)} className="cursor-pointer">
+                                1
+                              </PaginationLink>
+                            </PaginationItem>
+                            {currentPage > 4 && (
+                              <PaginationItem>
+                                <PaginationEllipsis />
+                              </PaginationItem>
+                            )}
+                          </>
+                        )}
+
+                        {/* Current page range */}
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          const pageNumber = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                          if (pageNumber > totalPages) return null;
+                          
+                          return (
+                            <PaginationItem key={pageNumber}>
+                              <PaginationLink
+                                onClick={() => handlePageChange(pageNumber)}
+                                isActive={pageNumber === currentPage}
+                                className="cursor-pointer"
+                              >
+                                {pageNumber}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        })}
+
+                        {/* Last page */}
+                        {currentPage < totalPages - 2 && (
+                          <>
+                            {currentPage < totalPages - 3 && (
+                              <PaginationItem>
+                                <PaginationEllipsis />
+                              </PaginationItem>
+                            )}
+                            <PaginationItem>
+                              <PaginationLink onClick={() => handlePageChange(totalPages)} className="cursor-pointer">
+                                {totalPages}
+                              </PaginationLink>
+                            </PaginationItem>
+                          </>
+                        )}
+
+                        <PaginationItem>
+                          <PaginationNext 
+                            onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                            className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </main>
