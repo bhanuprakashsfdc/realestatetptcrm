@@ -158,6 +158,102 @@ export type Database = {
         }
         Relationships: []
       }
+      projects: {
+        Row: {
+          completed_tasks: number | null
+          created_at: string
+          created_by: string
+          deadline: string | null
+          description: string | null
+          id: string
+          name: string
+          progress: number | null
+          status: string | null
+          team_members: string[] | null
+          total_tasks: number | null
+          updated_at: string
+        }
+        Insert: {
+          completed_tasks?: number | null
+          created_at?: string
+          created_by: string
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          progress?: number | null
+          status?: string | null
+          team_members?: string[] | null
+          total_tasks?: number | null
+          updated_at?: string
+        }
+        Update: {
+          completed_tasks?: number | null
+          created_at?: string
+          created_by?: string
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          progress?: number | null
+          status?: string | null
+          team_members?: string[] | null
+          total_tasks?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      properties: {
+        Row: {
+          address: string | null
+          bathrooms: number | null
+          bedrooms: number | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          image_url: string | null
+          price: string
+          size: string | null
+          status: string | null
+          title: string
+          type: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          price: string
+          size?: string | null
+          status?: string | null
+          title: string
+          type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          price?: string
+          size?: string | null
+          status?: string | null
+          title?: string
+          type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           assigned_to: string | null
