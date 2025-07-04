@@ -52,15 +52,7 @@ export type Database = {
           type?: string | null
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "contacts_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       leads: {
         Row: {

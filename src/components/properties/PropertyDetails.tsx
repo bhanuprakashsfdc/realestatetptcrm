@@ -1,22 +1,93 @@
 
-import React from 'react';
-import { MapPin, Bed, Bath, Square, Edit, Trash2, Copy, Heart } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { MapPin, Bed, Bath, Square, Edit, Trash2, Copy, Heart, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PropertyCarousel } from './PropertyCarousel';
 import { PropertyMap } from './PropertyMap';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export const PropertyDetails = () => {
+  const { id } = useParams();
+  const [property, setProperty] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (id) {
+      fetchProperty(id);
+    }
+  }, [id]);
+
+  const fetchProperty = async (propertyId: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('id', propertyId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching property:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch property details",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!data) {
+        toast({
+          title: "Not Found",
+          description: "Property not found",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setProperty(data);
+    } catch (error) {
+      console.error('Error fetching property:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch property details",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading property details...</span>
+      </div>
+    );
+  }
+
+  if (!property) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <span>Property not found</span>
+      </div>
+    );
+  }
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Luxury Villa in Beverly Hills</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{property.title}</h1>
           <p className="text-gray-600 flex items-center gap-2 mt-1">
             <MapPin className="w-4 h-4" />
-            1234 Sunset Boulevard, Beverly Hills, CA 90210
+            {property.address}
           </p>
         </div>
         <div className="flex gap-3">
@@ -57,28 +128,28 @@ export const PropertyDetails = () => {
                   <Square className="w-5 h-5 text-landify-blue" />
                   <div>
                     <p className="text-sm text-gray-600">Size</p>
-                    <p className="font-semibold text-gray-900">3,500 sq ft</p>
+                    <p className="font-semibold text-gray-900">{property.size || 'N/A'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <Bed className="w-5 h-5 text-landify-blue" />
                   <div>
                     <p className="text-sm text-gray-600">Bedrooms</p>
-                    <p className="font-semibold text-gray-900">5</p>
+                    <p className="font-semibold text-gray-900">{property.bedrooms || 'N/A'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <Bath className="w-5 h-5 text-landify-blue" />
                   <div>
                     <p className="text-sm text-gray-600">Bathrooms</p>
-                    <p className="font-semibold text-gray-900">4</p>
+                    <p className="font-semibold text-gray-900">{property.bathrooms || 'N/A'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <MapPin className="w-5 h-5 text-landify-blue" />
                   <div>
                     <p className="text-sm text-gray-600">Type</p>
-                    <p className="font-semibold text-gray-900">Villa</p>
+                    <p className="font-semibold text-gray-900">{property.type || 'N/A'}</p>
                   </div>
                 </div>
               </div>
@@ -99,10 +170,7 @@ export const PropertyDetails = () => {
               <div>
                 <h3 className="font-semibold text-gray-900 mb-3">Description</h3>
                 <p className="text-gray-600 leading-relaxed">
-                  This stunning luxury villa offers breathtaking views and premium finishes throughout. 
-                  Located in the prestigious Beverly Hills area, this property features spacious living areas, 
-                  a gourmet kitchen, and beautifully landscaped grounds. Perfect for entertaining with its 
-                  open floor plan and resort-style backyard.
+                  {property.description || 'No description available.'}
                 </p>
               </div>
             </CardContent>
@@ -116,8 +184,12 @@ export const PropertyDetails = () => {
             <CardContent className="p-6">
               <div className="text-center space-y-4">
                 <div>
-                  <p className="text-3xl font-bold text-gray-900">$2,850,000</p>
-                  <Badge className="mt-2 bg-green-100 text-green-800">For Sale</Badge>
+                  <p className="text-3xl font-bold text-gray-900">{property.price}</p>
+                  <Badge className={`mt-2 ${
+                    property.status === 'For Sale' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {property.status}
+                  </Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
