@@ -13,8 +13,9 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { Plus, MapPin, Bed, Bath, Square, Eye, Loader2 } from 'lucide-react';
+import { Plus, MapPin, Bed, Bath, Square, Eye, Loader2, Edit, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { PropertyModal } from '@/components/properties/PropertyModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,6 +27,10 @@ const PropertiesList = () => {
   const [properties, setProperties] = useState<any[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [selectedProperty, setSelectedProperty] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const toggleSidebar = () => {
@@ -77,6 +82,93 @@ const PropertiesList = () => {
     setCurrentPage(page);
   };
 
+  const handleCreateProperty = () => {
+    setModalMode('create');
+    setSelectedProperty(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditProperty = (property: any) => {
+    setModalMode('edit');
+    setSelectedProperty(property);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteProperty = async (property: any) => {
+    if (!confirm(`Are you sure you want to delete "${property.title}"?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('properties')
+        .delete()
+        .eq('id', property.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Property deleted successfully",
+      });
+
+      fetchProperties(currentPage);
+    } catch (error) {
+      console.error('Error deleting property:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete property",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSubmitProperty = async (data: any) => {
+    try {
+      setIsSubmitting(true);
+      
+      if (modalMode === 'create') {
+        const { error } = await supabase
+          .from('properties')
+          .insert([{ ...data, created_by: crypto.randomUUID() }]);
+        
+        if (error) throw error;
+        
+        toast({
+          title: "Success",
+          description: "Property created successfully",
+        });
+      } else {
+        const { error } = await supabase
+          .from('properties')
+          .update(data)
+          .eq('id', selectedProperty.id);
+        
+        if (error) throw error;
+        
+        toast({
+          title: "Success",
+          description: "Property updated successfully",
+        });
+      }
+      
+      setIsModalOpen(false);
+      fetchProperties(currentPage);
+    } catch (error) {
+      console.error('Error submitting property:', error);
+      toast({
+        title: "Error",
+        description: `Failed to ${modalMode} property`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedProperty(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <div className={`${sidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 flex-shrink-0`}>
@@ -88,7 +180,10 @@ const PropertiesList = () => {
           <div className="p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Properties</h1>
-              <Button className="bg-landify-blue hover:bg-landify-blue-light w-full sm:w-auto">
+              <Button 
+                className="bg-landify-blue hover:bg-landify-blue-light w-full sm:w-auto"
+                onClick={handleCreateProperty}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Add New Property
               </Button>
@@ -142,12 +237,28 @@ const PropertiesList = () => {
                           </div>
                         </div>
 
-                        <Link to={`/properties/${property.id}`}>
-                          <Button variant="outline" className="w-full">
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
+                        <div className="flex gap-2">
+                          <Link to={`/properties/${property.id}`} className="flex-1">
+                            <Button variant="outline" className="w-full">
+                              <Eye className="w-4 h-4 mr-2" />
+                              View
+                            </Button>
+                          </Link>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleEditProperty(property)}
+                          >
+                            <Edit className="w-4 h-4" />
                           </Button>
-                        </Link>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleDeleteProperty(property)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -229,6 +340,15 @@ const PropertiesList = () => {
           </div>
         </main>
       </div>
+
+      <PropertyModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onSubmit={handleSubmitProperty}
+        initialData={selectedProperty}
+        isLoading={isSubmitting}
+        mode={modalMode}
+      />
     </div>
   );
 };

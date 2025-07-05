@@ -14,8 +14,9 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { Plus, Phone, Mail, Building, Eye, Loader2 } from 'lucide-react';
+import { Plus, Phone, Mail, Building, Eye, Loader2, Edit, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { ContactModal } from '@/components/contacts/ContactModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -27,6 +28,10 @@ const ContactsList = () => {
   const [contacts, setContacts] = useState<any[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [selectedContact, setSelectedContact] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const toggleSidebar = () => {
@@ -78,6 +83,93 @@ const ContactsList = () => {
     setCurrentPage(page);
   };
 
+  const handleCreateContact = () => {
+    setModalMode('create');
+    setSelectedContact(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditContact = (contact: any) => {
+    setModalMode('edit');
+    setSelectedContact(contact);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteContact = async (contact: any) => {
+    if (!confirm(`Are you sure you want to delete "${contact.name}"?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('contacts')
+        .delete()
+        .eq('id', contact.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Contact deleted successfully",
+      });
+
+      fetchContacts(currentPage);
+    } catch (error) {
+      console.error('Error deleting contact:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete contact",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSubmitContact = async (data: any) => {
+    try {
+      setIsSubmitting(true);
+      
+      if (modalMode === 'create') {
+        const { error } = await supabase
+          .from('contacts')
+          .insert([{ ...data, created_by: crypto.randomUUID() }]);
+        
+        if (error) throw error;
+        
+        toast({
+          title: "Success",
+          description: "Contact created successfully",
+        });
+      } else {
+        const { error } = await supabase
+          .from('contacts')
+          .update(data)
+          .eq('id', selectedContact.id);
+        
+        if (error) throw error;
+        
+        toast({
+          title: "Success",
+          description: "Contact updated successfully",
+        });
+      }
+      
+      setIsModalOpen(false);
+      fetchContacts(currentPage);
+    } catch (error) {
+      console.error('Error submitting contact:', error);
+      toast({
+        title: "Error",
+        description: `Failed to ${modalMode} contact`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedContact(null);
+  };
+
   const getStatusColor = (type: string) => {
     switch (type) {
       case 'client': return 'bg-green-100 text-green-800';
@@ -98,7 +190,10 @@ const ContactsList = () => {
           <div className="p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Contacts</h1>
-              <Button className="bg-landify-blue hover:bg-landify-blue-light w-full sm:w-auto">
+              <Button 
+                className="bg-landify-blue hover:bg-landify-blue-light w-full sm:w-auto"
+                onClick={handleCreateContact}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Add New Contact
               </Button>
@@ -151,12 +246,28 @@ const ContactsList = () => {
                           </div>
                         </div>
 
-                        <Link to={`/contacts/${contact.id}`}>
-                          <Button variant="outline" className="w-full">
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
+                        <div className="flex gap-2">
+                          <Link to={`/contacts/${contact.id}`} className="flex-1">
+                            <Button variant="outline" className="w-full">
+                              <Eye className="w-4 h-4 mr-2" />
+                              View
+                            </Button>
+                          </Link>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleEditContact(contact)}
+                          >
+                            <Edit className="w-4 h-4" />
                           </Button>
-                        </Link>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleDeleteContact(contact)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -238,6 +349,15 @@ const ContactsList = () => {
           </div>
         </main>
       </div>
+
+      <ContactModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onSubmit={handleSubmitContact}
+        initialData={selectedContact}
+        isLoading={isSubmitting}
+        mode={modalMode}
+      />
     </div>
   );
 };

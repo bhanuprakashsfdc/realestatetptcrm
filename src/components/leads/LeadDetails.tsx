@@ -1,27 +1,112 @@
 
-import React from 'react';
-import { Phone, Mail, User, Calendar, MessageCircle, Edit } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { Phone, Mail, User, Calendar, MessageCircle, Edit, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LeadTimeline } from './LeadTimeline';
 import { LeadNotes } from './LeadNotes';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export const LeadDetails = () => {
+  const { id } = useParams();
+  const [lead, setLead] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (id) {
+      fetchLead(id);
+    }
+  }, [id]);
+
+  const fetchLead = async (leadId: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('id', leadId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching lead:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch lead details",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!data) {
+        toast({
+          title: "Not Found",
+          description: "Lead not found",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setLead(data);
+    } catch (error) {
+      console.error('Error fetching lead:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch lead details",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'new': return 'bg-blue-100 text-blue-800';
+      case 'contacted': return 'bg-yellow-100 text-yellow-800';
+      case 'qualified': return 'bg-green-100 text-green-800';
+      case 'converted': return 'bg-emerald-100 text-emerald-800';
+      case 'lost': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading lead details...</span>
+      </div>
+    );
+  }
+
+  if (!lead) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <span>Lead not found</span>
+      </div>
+    );
+  }
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Avatar className="w-16 h-16 border-4 border-white shadow-lg">
-            <AvatarImage src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face" />
-            <AvatarFallback className="bg-landify-blue text-white text-lg font-semibold">JD</AvatarFallback>
+            <AvatarFallback className="bg-landify-blue text-white text-lg font-semibold">
+              {lead.name.split(' ').map((n: string) => n[0]).join('')}
+            </AvatarFallback>
           </Avatar>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">John Doe</h1>
-            <p className="text-gray-600">Potential Buyer • High Priority</p>
-            <Badge className="mt-1 bg-green-100 text-green-800">In Progress</Badge>
+            <h1 className="text-3xl font-bold text-gray-900">{lead.name}</h1>
+            <p className="text-gray-600">{lead.property_type || 'Potential Buyer'} • {lead.source || 'Unknown Source'}</p>
+            <Badge className={getStatusColor(lead.status)}>
+              {lead.status || 'new'}
+            </Badge>
           </div>
         </div>
         <div className="flex gap-3">
@@ -55,14 +140,14 @@ export const LeadDetails = () => {
                   <Phone className="w-5 h-5 text-landify-blue" />
                   <div>
                     <p className="text-sm text-gray-600">Phone</p>
-                    <p className="font-semibold text-gray-900">+1 (555) 123-4567</p>
+                    <p className="font-semibold text-gray-900">{lead.phone || 'N/A'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <Mail className="w-5 h-5 text-landify-blue" />
                   <div>
                     <p className="text-sm text-gray-600">Email</p>
-                    <p className="font-semibold text-gray-900">john.doe@email.com</p>
+                    <p className="font-semibold text-gray-900">{lead.email || 'N/A'}</p>
                   </div>
                 </div>
               </div>
@@ -70,19 +155,28 @@ export const LeadDetails = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Lead Source</p>
-                  <p className="font-semibold text-gray-900">Website Inquiry</p>
+                  <p className="font-semibold text-gray-900">{lead.source || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Interest</p>
-                  <p className="font-semibold text-gray-900">Luxury Homes</p>
+                  <p className="text-sm text-gray-600 mb-1">Property Type</p>
+                  <p className="font-semibold text-gray-900">{lead.property_type || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Budget Range</p>
-                  <p className="font-semibold text-gray-900">$2M - $3M</p>
+                  <p className="font-semibold text-gray-900">
+                    {lead.budget_min && lead.budget_max 
+                      ? `$${lead.budget_min.toLocaleString()} - $${lead.budget_max.toLocaleString()}`
+                      : lead.budget_min 
+                        ? `From $${lead.budget_min.toLocaleString()}`
+                        : lead.budget_max
+                          ? `Up to $${lead.budget_max.toLocaleString()}`
+                          : 'N/A'
+                    }
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Location Preference</p>
-                  <p className="font-semibold text-gray-900">Beverly Hills</p>
+                  <p className="font-semibold text-gray-900">{lead.location || 'N/A'}</p>
                 </div>
               </div>
             </CardContent>
