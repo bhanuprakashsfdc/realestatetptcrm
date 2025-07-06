@@ -51,13 +51,13 @@ export const ContactForm = ({ initialData, onSubmit, onCancel, isLoading }: Cont
     // Clean and format data for submission
     const cleanedData = {
       name: data.name.trim(),
-      email: data.email && data.email.trim() !== '' ? data.email.trim() : null,
-      phone: data.phone && data.phone.trim() !== '' ? data.phone.trim() : null,
-      company: data.company && data.company.trim() !== '' ? data.company.trim() : null,
-      position: data.position && data.position.trim() !== '' ? data.position.trim() : null,
+      email: data.email && data.email.trim() !== '' ? data.email.trim() : undefined,
+      phone: data.phone && data.phone.trim() !== '' ? data.phone.trim() : undefined,
+      company: data.company && data.company.trim() !== '' ? data.company.trim() : undefined,
+      position: data.position && data.position.trim() !== '' ? data.position.trim() : undefined,
       type: data.type || 'client',
-      address: data.address && data.address.trim() !== '' ? data.address.trim() : null,
-      notes: data.notes && data.notes.trim() !== '' ? data.notes.trim() : null,
+      address: data.address && data.address.trim() !== '' ? data.address.trim() : undefined,
+      notes: data.notes && data.notes.trim() !== '' ? data.notes.trim() : undefined,
     };
     
     console.log('ContactForm cleaned data:', cleanedData);

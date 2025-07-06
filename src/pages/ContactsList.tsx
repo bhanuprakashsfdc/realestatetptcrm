@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { DashboardSidebar } from '@/components/layout/DashboardSidebar';
 import { DashboardHeader } from '@/components/layout/DashboardHeader';
@@ -189,12 +190,25 @@ const ContactsList = () => {
       
       if (modalMode === 'create') {
         console.log('Creating new contact');
+        
+        // Remove undefined values and ensure created_by is set
+        const insertData = {
+          name: data.name,
+          email: data.email || null,
+          phone: data.phone || null,
+          company: data.company || null,
+          position: data.position || null,
+          type: data.type || 'client',
+          address: data.address || null,
+          notes: data.notes || null,
+          created_by: crypto.randomUUID() // Temporary user ID until auth is implemented
+        };
+        
+        console.log('Final insert data:', insertData);
+        
         const { data: newContact, error } = await supabase
           .from('contacts')
-          .insert([{ 
-            ...data, 
-            created_by: crypto.randomUUID() // Temporary user ID until auth is implemented
-          }])
+          .insert([insertData])
           .select()
           .single();
         
@@ -210,9 +224,24 @@ const ContactsList = () => {
         });
       } else {
         console.log('Updating existing contact:', selectedContact.id);
+        
+        // Remove undefined values for update
+        const updateData = {
+          name: data.name,
+          email: data.email || null,
+          phone: data.phone || null,
+          company: data.company || null,
+          position: data.position || null,
+          type: data.type || 'client',
+          address: data.address || null,
+          notes: data.notes || null,
+        };
+        
+        console.log('Update data:', updateData);
+        
         const { data: updatedContact, error } = await supabase
           .from('contacts')
-          .update(data)
+          .update(updateData)
           .eq('id', selectedContact.id)
           .select()
           .single();
@@ -283,6 +312,17 @@ const ContactsList = () => {
               <div className="flex justify-center items-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin" />
                 <span className="ml-2">Loading contacts...</span>
+              </div>
+            ) : contacts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <p className="text-gray-500 mb-4">No contacts found. Create your first contact to get started!</p>
+                <Button 
+                  className="bg-landify-blue hover:bg-landify-blue-light"
+                  onClick={handleCreateContact}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add New Contact
+                </Button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
