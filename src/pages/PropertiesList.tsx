@@ -13,7 +13,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { Plus, MapPin, Bed, Bath, Square, Eye, Loader2, Edit, Trash2 } from 'lucide-react';
+import { Plus, MapPin, Bed, Bath, Square, Eye, Loader2, Edit, Trash2, Copy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PropertyModal } from '@/components/properties/PropertyModal';
 import { supabase } from '@/integrations/supabase/client';
@@ -94,6 +94,39 @@ const PropertiesList = () => {
     setIsModalOpen(true);
   };
 
+  const handleDuplicateProperty = async (property: any) => {
+    try {
+      const duplicateData = {
+        ...property,
+        title: `${property.title} (Copy)`,
+        id: undefined,
+        created_at: undefined,
+        updated_at: undefined,
+        created_by: crypto.randomUUID()
+      };
+
+      const { error } = await supabase
+        .from('properties')
+        .insert([duplicateData]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Property duplicated successfully",
+      });
+
+      fetchProperties(currentPage);
+    } catch (error) {
+      console.error('Error duplicating property:', error);
+      toast({
+        title: "Error",
+        description: "Failed to duplicate property",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleDeleteProperty = async (property: any) => {
     if (!confirm(`Are you sure you want to delete "${property.title}"?`)) return;
 
@@ -169,6 +202,16 @@ const PropertiesList = () => {
     setSelectedProperty(null);
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'For Sale': return 'bg-green-100 text-green-800';
+      case 'For Rent': return 'bg-blue-100 text-blue-800';
+      case 'Sold': return 'bg-gray-100 text-gray-800';
+      case 'Rented': return 'bg-purple-100 text-purple-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <div className={`${sidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 flex-shrink-0`}>
@@ -197,43 +240,63 @@ const PropertiesList = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
                 {properties.map((property) => (
-                  <Card key={property.id} className="shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                    <div className="relative aspect-[4/3]">
-                      <img
-                        src={property.image_url || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=400&h=300&fit=crop'}
-                        alt={property.title}
-                        className="w-full h-full object-cover"
-                      />
-                      <Badge className={`absolute top-3 right-3 ${
-                        property.status === 'For Sale' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {property.status}
-                      </Badge>
-                    </div>
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        <div>
-                          <h3 className="font-semibold text-gray-900 text-lg truncate">{property.title}</h3>
-                          <p className="text-2xl font-bold text-landify-blue">{property.price}</p>
+                  <Card key={property.id} className="shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="space-y-4">
+                        <div className="aspect-video bg-gray-200 rounded-lg overflow-hidden">
+                          {property.image_url ? (
+                            <img 
+                              src={property.image_url} 
+                              alt={property.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                              No Image
+                            </div>
+                          )}
                         </div>
-                        
-                        <p className="text-gray-600 flex items-center gap-1 text-sm">
-                          <MapPin className="w-4 h-4 flex-shrink-0" />
-                          <span className="truncate">{property.address}</span>
-                        </p>
 
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                          <div className="flex items-center gap-1">
-                            <Square className="w-4 h-4" />
-                            {property.size}
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between">
+                            <h3 className="font-semibold text-gray-900 line-clamp-2">{property.title}</h3>
+                            <Badge className={getStatusColor(property.status)}>
+                              {property.status}
+                            </Badge>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Bed className="w-4 h-4" />
-                            {property.bedrooms}
+                          
+                          <p className="text-xl font-bold text-landify-blue">{property.price}</p>
+                          
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <MapPin className="w-4 h-4 flex-shrink-0" />
+                            <span className="truncate">{property.address}</span>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Bath className="w-4 h-4" />
-                            {property.bathrooms}
+
+                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                            {property.bedrooms && (
+                              <div className="flex items-center gap-1">
+                                <Bed className="w-4 h-4" />
+                                <span>{property.bedrooms}</span>
+                              </div>
+                            )}
+                            {property.bathrooms && (
+                              <div className="flex items-center gap-1">
+                                <Bath className="w-4 h-4" />
+                                <span>{property.bathrooms}</span>
+                              </div>
+                            )}
+                            {property.size && (
+                              <div className="flex items-center gap-1">
+                                <Square className="w-4 h-4" />
+                                <span>{property.size}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                          <div className="text-sm text-gray-600">
+                            Created: {new Date(property.created_at).toLocaleDateString()}
                           </div>
                         </div>
 
@@ -250,6 +313,13 @@ const PropertiesList = () => {
                             onClick={() => handleEditProperty(property)}
                           >
                             <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleDuplicateProperty(property)}
+                          >
+                            <Copy className="w-4 h-4" />
                           </Button>
                           <Button 
                             variant="outline" 

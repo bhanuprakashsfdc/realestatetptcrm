@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PropertyCarousel } from './PropertyCarousel';
 import { PropertyMap } from './PropertyMap';
+import { PropertyModal } from './PropertyModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -14,6 +15,8 @@ export const PropertyDetails = () => {
   const { id } = useParams();
   const [property, setProperty] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -63,6 +66,105 @@ export const PropertyDetails = () => {
     }
   };
 
+  const handleEdit = () => {
+    setIsEditModalOpen(true);
+  };
+
+  const handleDuplicate = async () => {
+    if (!property) return;
+
+    try {
+      const duplicateData = {
+        ...property,
+        title: `${property.title} (Copy)`,
+        id: undefined,
+        created_at: undefined,
+        updated_at: undefined,
+        created_by: crypto.randomUUID()
+      };
+
+      const { data, error } = await supabase
+        .from('properties')
+        .insert([duplicateData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Property duplicated successfully",
+      });
+
+      // Refresh the current property data
+      fetchProperty(id!);
+    } catch (error) {
+      console.error('Error duplicating property:', error);
+      toast({
+        title: "Error",
+        description: "Failed to duplicate property",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!property || !confirm(`Are you sure you want to delete "${property.title}"? This action cannot be undone.`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('properties')
+        .delete()
+        .eq('id', property.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Property deleted successfully",
+      });
+
+      // Navigate back or redirect
+      window.history.back();
+    } catch (error) {
+      console.error('Error deleting property:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete property",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSubmitEdit = async (data: any) => {
+    try {
+      setIsSubmitting(true);
+      const { error } = await supabase
+        .from('properties')
+        .update(data)
+        .eq('id', property.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Property updated successfully",
+      });
+
+      setIsEditModalOpen(false);
+      fetchProperty(id!);
+    } catch (error) {
+      console.error('Error updating property:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update property",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -79,6 +181,7 @@ export const PropertyDetails = () => {
       </div>
     );
   }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -95,15 +198,15 @@ export const PropertyDetails = () => {
             <Heart className="w-4 h-4 mr-2" />
             Save
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={handleDuplicate}>
             <Copy className="w-4 h-4 mr-2" />
             Duplicate
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={handleEdit}>
             <Edit className="w-4 h-4 mr-2" />
             Edit
           </Button>
-          <Button variant="destructive" size="sm">
+          <Button variant="destructive" size="sm" onClick={handleDelete}>
             <Trash2 className="w-4 h-4 mr-2" />
             Delete
           </Button>
@@ -212,6 +315,15 @@ export const PropertyDetails = () => {
           <PropertyMap />
         </div>
       </div>
+
+      <PropertyModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSubmit={handleSubmitEdit}
+        initialData={property}
+        isLoading={isSubmitting}
+        mode="edit"
+      />
     </div>
   );
 };

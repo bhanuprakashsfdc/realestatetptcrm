@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProjectTasks } from './ProjectTasks';
 import { ProjectFiles } from './ProjectFiles';
 import { ProjectTeam } from './ProjectTeam';
+import { ProjectModal } from './ProjectModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -17,6 +18,8 @@ export const ProjectDetails = () => {
   const { id } = useParams();
   const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -66,6 +69,103 @@ export const ProjectDetails = () => {
     }
   };
 
+  const handleEdit = () => {
+    setIsEditModalOpen(true);
+  };
+
+  const handleDuplicate = async () => {
+    if (!project) return;
+
+    try {
+      const duplicateData = {
+        ...project,
+        name: `${project.name} (Copy)`,
+        id: undefined,
+        created_at: undefined,
+        updated_at: undefined,
+        created_by: crypto.randomUUID()
+      };
+
+      const { data, error } = await supabase
+        .from('projects')
+        .insert([duplicateData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Project duplicated successfully",
+      });
+
+      fetchProject(id!);
+    } catch (error) {
+      console.error('Error duplicating project:', error);
+      toast({
+        title: "Error",
+        description: "Failed to duplicate project",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!project || !confirm(`Are you sure you want to delete "${project.name}"? This action cannot be undone.`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', project.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Project deleted successfully",
+      });
+
+      window.history.back();
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete project",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSubmitEdit = async (data: any) => {
+    try {
+      setIsSubmitting(true);
+      const { error } = await supabase
+        .from('projects')
+        .update(data)
+        .eq('id', project.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Project updated successfully",
+      });
+
+      setIsEditModalOpen(false);
+      fetchProject(id!);
+    } catch (error) {
+      console.error('Error updating project:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update project",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Planning': return 'bg-blue-100 text-blue-800';
@@ -100,6 +200,7 @@ export const ProjectDetails = () => {
       </div>
     );
   }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -119,15 +220,15 @@ export const ProjectDetails = () => {
             <Heart className="w-4 h-4 mr-2" />
             Save
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={handleDuplicate}>
             <Copy className="w-4 h-4 mr-2" />
             Duplicate
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={handleEdit}>
             <Edit className="w-4 h-4 mr-2" />
             Edit
           </Button>
-          <Button variant="destructive" size="sm">
+          <Button variant="destructive" size="sm" onClick={handleDelete}>
             <Trash2 className="w-4 h-4 mr-2" />
             Delete
           </Button>
@@ -253,6 +354,15 @@ export const ProjectDetails = () => {
           <ProjectFiles />
         </div>
       </div>
+
+      <ProjectModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSubmit={handleSubmitEdit}
+        initialData={project}
+        isLoading={isSubmitting}
+        mode="edit"
+      />
     </div>
   );
 };

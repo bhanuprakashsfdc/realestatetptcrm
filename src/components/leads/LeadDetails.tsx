@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Phone, Mail, User, Calendar, MessageCircle, Edit, Loader2 } from 'lucide-react';
+import { Phone, Mail, User, Calendar, MessageCircle, Edit, Loader2, Trash2, Copy } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LeadTimeline } from './LeadTimeline';
 import { LeadNotes } from './LeadNotes';
+import { LeadModal } from './LeadModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,6 +16,8 @@ export const LeadDetails = () => {
   const { id } = useParams();
   const [lead, setLead] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -64,6 +67,103 @@ export const LeadDetails = () => {
     }
   };
 
+  const handleEdit = () => {
+    setIsEditModalOpen(true);
+  };
+
+  const handleDuplicate = async () => {
+    if (!lead) return;
+
+    try {
+      const duplicateData = {
+        ...lead,
+        name: `${lead.name} (Copy)`,
+        id: undefined,
+        created_at: undefined,
+        updated_at: undefined,
+        created_by: crypto.randomUUID()
+      };
+
+      const { data, error } = await supabase
+        .from('leads')
+        .insert([duplicateData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Lead duplicated successfully",
+      });
+
+      fetchLead(id!);
+    } catch (error) {
+      console.error('Error duplicating lead:', error);
+      toast({
+        title: "Error",
+        description: "Failed to duplicate lead",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!lead || !confirm(`Are you sure you want to delete "${lead.name}"? This action cannot be undone.`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .delete()
+        .eq('id', lead.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Lead deleted successfully",
+      });
+
+      window.history.back();
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete lead",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSubmitEdit = async (data: any) => {
+    try {
+      setIsSubmitting(true);
+      const { error } = await supabase
+        .from('leads')
+        .update(data)
+        .eq('id', lead.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Lead updated successfully",
+      });
+
+      setIsEditModalOpen(false);
+      fetchLead(id!);
+    } catch (error) {
+      console.error('Error updating lead:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update lead",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'new': return 'bg-blue-100 text-blue-800';
@@ -91,6 +191,7 @@ export const LeadDetails = () => {
       </div>
     );
   }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -118,9 +219,17 @@ export const LeadDetails = () => {
             <User className="w-4 h-4 mr-2" />
             Assign to Agent
           </Button>
-          <Button size="sm" className="bg-landify-blue hover:bg-landify-blue-light">
+          <Button variant="outline" size="sm" onClick={handleDuplicate}>
+            <Copy className="w-4 h-4 mr-2" />
+            Duplicate
+          </Button>
+          <Button size="sm" className="bg-landify-blue hover:bg-landify-blue-light" onClick={handleEdit}>
             <Edit className="w-4 h-4 mr-2" />
             Edit Lead
+          </Button>
+          <Button variant="destructive" size="sm" onClick={handleDelete}>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete
           </Button>
         </div>
       </div>
@@ -233,6 +342,15 @@ export const LeadDetails = () => {
           <LeadNotes />
         </div>
       </div>
+
+      <LeadModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSubmit={handleSubmitEdit}
+        initialData={lead}
+        isLoading={isSubmitting}
+        mode="edit"
+      />
     </div>
   );
 };

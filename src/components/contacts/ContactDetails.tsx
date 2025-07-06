@@ -1,13 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Phone, Mail, Building, MapPin, MessageCircle, Edit, Star, Loader2 } from 'lucide-react';
+import { Phone, Mail, Building, MapPin, MessageCircle, Edit, Star, Loader2, Trash2, Copy } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ContactTimeline } from './ContactTimeline';
 import { ContactNotes } from './ContactNotes';
+import { ContactModal } from './ContactModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,6 +15,8 @@ export const ContactDetails = () => {
   const { id } = useParams();
   const [contact, setContact] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -64,6 +66,103 @@ export const ContactDetails = () => {
     }
   };
 
+  const handleEdit = () => {
+    setIsEditModalOpen(true);
+  };
+
+  const handleDuplicate = async () => {
+    if (!contact) return;
+
+    try {
+      const duplicateData = {
+        ...contact,
+        name: `${contact.name} (Copy)`,
+        id: undefined,
+        created_at: undefined,
+        updated_at: undefined,
+        created_by: crypto.randomUUID()
+      };
+
+      const { data, error } = await supabase
+        .from('contacts')
+        .insert([duplicateData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Contact duplicated successfully",
+      });
+
+      fetchContact(id!);
+    } catch (error) {
+      console.error('Error duplicating contact:', error);
+      toast({
+        title: "Error",
+        description: "Failed to duplicate contact",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!contact || !confirm(`Are you sure you want to delete "${contact.name}"? This action cannot be undone.`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('contacts')
+        .delete()
+        .eq('id', contact.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Contact deleted successfully",
+      });
+
+      window.history.back();
+    } catch (error) {
+      console.error('Error deleting contact:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete contact",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSubmitEdit = async (data: any) => {
+    try {
+      setIsSubmitting(true);
+      const { error } = await supabase
+        .from('contacts')
+        .update(data)
+        .eq('id', contact.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Contact updated successfully",
+      });
+
+      setIsEditModalOpen(false);
+      fetchContact(id!);
+    } catch (error) {
+      console.error('Error updating contact:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update contact",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const getStatusColor = (type: string) => {
     switch (type) {
       case 'client': return 'bg-green-100 text-green-800';
@@ -89,6 +188,7 @@ export const ContactDetails = () => {
       </div>
     );
   }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -122,9 +222,17 @@ export const ContactDetails = () => {
             <MessageCircle className="w-4 h-4 mr-2" />
             Message
           </Button>
-          <Button size="sm" className="bg-landify-blue hover:bg-landify-blue-light">
+          <Button variant="outline" size="sm" onClick={handleDuplicate}>
+            <Copy className="w-4 h-4 mr-2" />
+            Duplicate
+          </Button>
+          <Button size="sm" className="bg-landify-blue hover:bg-landify-blue-light" onClick={handleEdit}>
             <Edit className="w-4 h-4 mr-2" />
             Edit Contact
+          </Button>
+          <Button variant="destructive" size="sm" onClick={handleDelete}>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete
           </Button>
         </div>
       </div>
@@ -175,19 +283,11 @@ export const ContactDetails = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Position</p>
-                    <p className="font-semibold text-gray-900">Senior Real Estate Agent</p>
+                    <p className="font-semibold text-gray-900">{contact.position || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Experience</p>
-                    <p className="font-semibold text-gray-900">8+ Years</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Specialization</p>
-                    <p className="font-semibold text-gray-900">Luxury Residential</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">License #</p>
-                    <p className="font-semibold text-gray-900">DRE #01234567</p>
+                    <p className="text-sm text-gray-600 mb-1">Type</p>
+                    <p className="font-semibold text-gray-900">{contact.type || 'client'}</p>
                   </div>
                 </div>
               </div>
@@ -272,6 +372,15 @@ export const ContactDetails = () => {
           <ContactNotes />
         </div>
       </div>
+
+      <ContactModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSubmit={handleSubmitEdit}
+        initialData={contact}
+        isLoading={isSubmitting}
+        mode="edit"
+      />
     </div>
   );
 };
