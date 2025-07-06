@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Phone, Mail, Building, MapPin, MessageCircle, Edit, Star, Loader2, Trash2, Copy } from 'lucide-react';
@@ -19,15 +20,11 @@ export const ContactDetails = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (id) {
-      fetchContact(id);
-    }
-  }, [id]);
-
   const fetchContact = async (contactId: string) => {
     try {
       setLoading(true);
+      console.log('Fetching contact details for ID:', contactId);
+      
       const { data, error } = await supabase
         .from('contacts')
         .select('*')
@@ -45,6 +42,7 @@ export const ContactDetails = () => {
       }
 
       if (!data) {
+        console.log('Contact not found');
         toast({
           title: "Not Found",
           description: "Contact not found",
@@ -53,6 +51,7 @@ export const ContactDetails = () => {
         return;
       }
 
+      console.log('Contact details fetched:', data);
       setContact(data);
     } catch (error) {
       console.error('Error fetching contact:', error);
@@ -66,13 +65,67 @@ export const ContactDetails = () => {
     }
   };
 
+  // Set up real-time subscription for this specific contact
+  useEffect(() => {
+    if (!id) return;
+
+    console.log('Setting up real-time subscription for contact:', id);
+    
+    const channel = supabase
+      .channel(`contact-${id}-changes`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'contacts',
+          filter: `id=eq.${id}`
+        },
+        (payload) => {
+          console.log('Real-time contact detail change:', payload);
+          
+          if (payload.eventType === 'UPDATE') {
+            console.log('Contact updated, refreshing details');
+            setContact(payload.new);
+            toast({
+              title: "Contact Updated",
+              description: "Contact details have been updated",
+            });
+          } else if (payload.eventType === 'DELETE') {
+            console.log('Contact deleted');
+            toast({
+              title: "Contact Deleted",
+              description: "This contact has been deleted",
+              variant: "destructive"
+            });
+            window.history.back();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('Cleaning up contact detail subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [id, toast]);
+
+  useEffect(() => {
+    if (id) {
+      fetchContact(id);
+    }
+  }, [id]);
+
   const handleEdit = () => {
+    console.log('Opening edit modal for contact');
     setIsEditModalOpen(true);
   };
 
   const handleDuplicate = async () => {
     if (!contact) return;
 
+    console.log('Duplicating contact:', contact);
+    
     try {
       const duplicateData = {
         ...contact,
@@ -83,20 +136,29 @@ export const ContactDetails = () => {
         created_by: crypto.randomUUID()
       };
 
+      console.log('Creating duplicate with data:', duplicateData);
+      
       const { data, error } = await supabase
         .from('contacts')
         .insert([duplicateData])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Duplicate error:', error);
+        throw error;
+      }
 
+      console.log('Contact duplicated successfully:', data);
       toast({
         title: "Success",
         description: "Contact duplicated successfully",
       });
 
-      fetchContact(id!);
+      // Navigate to the new contact or refresh current view
+      if (id) {
+        fetchContact(id);
+      }
     } catch (error) {
       console.error('Error duplicating contact:', error);
       toast({
@@ -110,14 +172,20 @@ export const ContactDetails = () => {
   const handleDelete = async () => {
     if (!contact || !confirm(`Are you sure you want to delete "${contact.name}"? This action cannot be undone.`)) return;
 
+    console.log('Deleting contact:', contact.id);
+    
     try {
       const { error } = await supabase
         .from('contacts')
         .delete()
         .eq('id', contact.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Delete error:', error);
+        throw error;
+      }
 
+      console.log('Contact deleted successfully');
       toast({
         title: "Success",
         description: "Contact deleted successfully",
@@ -137,20 +205,28 @@ export const ContactDetails = () => {
   const handleSubmitEdit = async (data: any) => {
     try {
       setIsSubmitting(true);
-      const { error } = await supabase
+      console.log('Updating contact with data:', data);
+      
+      const { data: updatedContact, error } = await supabase
         .from('contacts')
         .update(data)
-        .eq('id', contact.id);
+        .eq('id', contact.id)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Update error:', error);
+        throw error;
+      }
 
+      console.log('Contact updated successfully:', updatedContact);
       toast({
         title: "Success",
         description: "Contact updated successfully",
       });
 
       setIsEditModalOpen(false);
-      fetchContact(id!);
+      // The real-time subscription will update the UI automatically
     } catch (error) {
       console.error('Error updating contact:', error);
       toast({
@@ -168,6 +244,7 @@ export const ContactDetails = () => {
       case 'client': return 'bg-green-100 text-green-800';
       case 'partner': return 'bg-blue-100 text-blue-800';
       case 'prospect': return 'bg-yellow-100 text-yellow-800';
+      case 'vendor': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -291,6 +368,13 @@ export const ContactDetails = () => {
                   </div>
                 </div>
               </div>
+
+              {contact.notes && (
+                <div className="pt-4 border-t border-gray-100">
+                  <h3 className="font-semibold text-gray-900 mb-3">Notes</h3>
+                  <p className="text-gray-700">{contact.notes}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

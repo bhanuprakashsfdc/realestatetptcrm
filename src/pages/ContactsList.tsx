@@ -41,6 +41,8 @@ const ContactsList = () => {
   const fetchContacts = async (page: number) => {
     try {
       setLoading(true);
+      console.log('Fetching contacts for page:', page);
+      
       const itemsPerPage = ITEMS_PER_PAGE;
       const start = (page - 1) * itemsPerPage;
       const end = start + itemsPerPage - 1;
@@ -61,6 +63,9 @@ const ContactsList = () => {
         return;
       }
 
+      console.log('Fetched contacts:', data);
+      console.log('Total count:', count);
+      
       setContacts(data || []);
       setTotalPages(Math.ceil((count || 0) / itemsPerPage));
     } catch (error) {
@@ -75,6 +80,53 @@ const ContactsList = () => {
     }
   };
 
+  // Set up real-time subscription for automatic sync
+  useEffect(() => {
+    console.log('Setting up real-time subscription for contacts');
+    
+    const channel = supabase
+      .channel('contacts-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'contacts'
+        },
+        (payload) => {
+          console.log('Real-time contact change:', payload);
+          
+          // Refresh contacts when any change occurs
+          fetchContacts(currentPage);
+          
+          // Show appropriate toast message
+          const eventType = payload.eventType;
+          if (eventType === 'INSERT') {
+            toast({
+              title: "New Contact",
+              description: "A new contact has been added",
+            });
+          } else if (eventType === 'UPDATE') {
+            toast({
+              title: "Contact Updated",
+              description: "A contact has been updated",
+            });
+          } else if (eventType === 'DELETE') {
+            toast({
+              title: "Contact Deleted",
+              description: "A contact has been deleted",
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('Cleaning up real-time subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [currentPage, toast]);
+
   useEffect(() => {
     fetchContacts(currentPage);
   }, [currentPage]);
@@ -84,12 +136,14 @@ const ContactsList = () => {
   };
 
   const handleCreateContact = () => {
+    console.log('Opening create contact modal');
     setModalMode('create');
     setSelectedContact(null);
     setIsModalOpen(true);
   };
 
   const handleEditContact = (contact: any) => {
+    console.log('Opening edit contact modal for:', contact);
     setModalMode('edit');
     setSelectedContact(contact);
     setIsModalOpen(true);
@@ -98,20 +152,26 @@ const ContactsList = () => {
   const handleDeleteContact = async (contact: any) => {
     if (!confirm(`Are you sure you want to delete "${contact.name}"?`)) return;
 
+    console.log('Deleting contact:', contact.id);
+    
     try {
       const { error } = await supabase
         .from('contacts')
         .delete()
         .eq('id', contact.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Delete error:', error);
+        throw error;
+      }
 
+      console.log('Contact deleted successfully');
       toast({
         title: "Success",
         description: "Contact deleted successfully",
       });
 
-      fetchContacts(currentPage);
+      // Refresh will happen automatically via real-time subscription
     } catch (error) {
       console.error('Error deleting contact:', error);
       toast({
@@ -125,26 +185,44 @@ const ContactsList = () => {
   const handleSubmitContact = async (data: any) => {
     try {
       setIsSubmitting(true);
+      console.log('Submitting contact data:', data);
       
       if (modalMode === 'create') {
-        const { error } = await supabase
+        console.log('Creating new contact');
+        const { data: newContact, error } = await supabase
           .from('contacts')
-          .insert([{ ...data, created_by: crypto.randomUUID() }]);
+          .insert([{ 
+            ...data, 
+            created_by: crypto.randomUUID() // Temporary user ID until auth is implemented
+          }])
+          .select()
+          .single();
         
-        if (error) throw error;
+        if (error) {
+          console.error('Create error:', error);
+          throw error;
+        }
         
+        console.log('Contact created successfully:', newContact);
         toast({
           title: "Success",
           description: "Contact created successfully",
         });
       } else {
-        const { error } = await supabase
+        console.log('Updating existing contact:', selectedContact.id);
+        const { data: updatedContact, error } = await supabase
           .from('contacts')
           .update(data)
-          .eq('id', selectedContact.id);
+          .eq('id', selectedContact.id)
+          .select()
+          .single();
         
-        if (error) throw error;
+        if (error) {
+          console.error('Update error:', error);
+          throw error;
+        }
         
+        console.log('Contact updated successfully:', updatedContact);
         toast({
           title: "Success",
           description: "Contact updated successfully",
@@ -152,7 +230,7 @@ const ContactsList = () => {
       }
       
       setIsModalOpen(false);
-      fetchContacts(currentPage);
+      // Refresh will happen automatically via real-time subscription
     } catch (error) {
       console.error('Error submitting contact:', error);
       toast({
@@ -166,6 +244,7 @@ const ContactsList = () => {
   };
 
   const handleCloseModal = () => {
+    console.log('Closing contact modal');
     setIsModalOpen(false);
     setSelectedContact(null);
   };
@@ -175,6 +254,7 @@ const ContactsList = () => {
       case 'client': return 'bg-green-100 text-green-800';
       case 'partner': return 'bg-blue-100 text-blue-800';
       case 'prospect': return 'bg-yellow-100 text-yellow-800';
+      case 'vendor': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -226,18 +306,24 @@ const ContactsList = () => {
                         </div>
 
                         <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Building className="w-4 h-4 flex-shrink-0" />
-                            <span className="truncate">{contact.company}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Mail className="w-4 h-4 flex-shrink-0" />
-                            <span className="truncate">{contact.email}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Phone className="w-4 h-4 flex-shrink-0" />
-                            <span className="truncate">{contact.phone}</span>
-                          </div>
+                          {contact.company && (
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <Building className="w-4 h-4 flex-shrink-0" />
+                              <span className="truncate">{contact.company}</span>
+                            </div>
+                          )}
+                          {contact.email && (
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <Mail className="w-4 h-4 flex-shrink-0" />
+                              <span className="truncate">{contact.email}</span>
+                            </div>
+                          )}
+                          {contact.phone && (
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <Phone className="w-4 h-4 flex-shrink-0" />
+                              <span className="truncate">{contact.phone}</span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-center justify-between pt-2 border-t border-gray-100">
@@ -286,7 +372,6 @@ const ContactsList = () => {
                       />
                     </PaginationItem>
                     
-                    {/* First page */}
                     {currentPage > 3 && (
                       <>
                         <PaginationItem>
@@ -302,7 +387,6 @@ const ContactsList = () => {
                       </>
                     )}
 
-                    {/* Current page range */}
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                       const pageNumber = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
                       if (pageNumber > totalPages) return null;
@@ -320,7 +404,6 @@ const ContactsList = () => {
                       );
                     })}
 
-                    {/* Last page */}
                     {currentPage < totalPages - 2 && (
                       <>
                         {currentPage < totalPages - 3 && (

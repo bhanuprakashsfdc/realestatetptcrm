@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,7 +12,7 @@ import { Loader2 } from 'lucide-react';
 
 const contactSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  email: z.string().optional(),
+  email: z.string().email('Invalid email format').optional().or(z.literal('')),
   phone: z.string().optional(),
   company: z.string().optional(),
   position: z.string().optional(),
@@ -45,16 +46,21 @@ export const ContactForm = ({ initialData, onSubmit, onCancel, isLoading }: Cont
   });
 
   const handleSubmit = (data: ContactFormData) => {
+    console.log('ContactForm submitting data:', data);
+    
+    // Clean and format data for submission
     const cleanedData = {
-      ...data,
-      email: data.email || null,
-      phone: data.phone || null,
-      company: data.company || null,
-      position: data.position || null,
+      name: data.name.trim(),
+      email: data.email && data.email.trim() !== '' ? data.email.trim() : null,
+      phone: data.phone && data.phone.trim() !== '' ? data.phone.trim() : null,
+      company: data.company && data.company.trim() !== '' ? data.company.trim() : null,
+      position: data.position && data.position.trim() !== '' ? data.position.trim() : null,
       type: data.type || 'client',
-      address: data.address || null,
-      notes: data.notes || null,
+      address: data.address && data.address.trim() !== '' ? data.address.trim() : null,
+      notes: data.notes && data.notes.trim() !== '' ? data.notes.trim() : null,
     };
+    
+    console.log('ContactForm cleaned data:', cleanedData);
     onSubmit(cleanedData);
   };
 
@@ -110,7 +116,7 @@ export const ContactForm = ({ initialData, onSubmit, onCancel, isLoading }: Cont
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Type</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select type" />
