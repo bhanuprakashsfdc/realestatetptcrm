@@ -8,12 +8,31 @@ import { SalesChart } from '@/components/dashboard/SalesChart';
 import { SalesReportsTable } from '@/components/dashboard/SalesReportsTable';
 import { NewPropertiesList } from '@/components/dashboard/NewPropertiesList';
 import { MessagesList } from '@/components/dashboard/MessagesList';
+import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const Index = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { data: metrics, isLoading, error } = useDashboardMetrics();
 
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
+  };
+
+  // Helper function to calculate percentage change (placeholder for now)
+  const getPercentageChange = (current: number, category: string) => {
+    // For now, return some sample changes. In a real app, you'd compare with previous period
+    const changes = {
+      totalProperties: '+8%',
+      propertiesForSale: '+12%',
+      propertiesForRent: '-10%',
+      newLeads: '+6%'
+    };
+    return changes[category as keyof typeof changes] || '+0%';
+  };
+
+  const getChangeType = (change: string): 'positive' | 'negative' => {
+    return change.startsWith('+') ? 'positive' : 'negative';
   };
 
   return (
@@ -32,38 +51,55 @@ const Index = () => {
           <div className="p-6 space-y-6">
             {/* Metrics Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <MetricCard
-                title="Total properties"
-                value="59"
-                change="+8%"
-                changeType="positive"
-                icon={Home}
-                iconColor="text-landify-blue"
-              />
-              <MetricCard
-                title="Properties for sale"
-                value="23"
-                change="+12%"
-                changeType="positive"
-                icon={Building}
-                iconColor="text-green-500"
-              />
-              <MetricCard
-                title="Properties for rent"
-                value="36"
-                change="-10%"
-                changeType="negative"
-                icon={Building}
-                iconColor="text-blue-500"
-              />
-              <MetricCard
-                title="New leads"
-                value="320"
-                change="+6%"
-                changeType="positive"
-                icon={Users}
-                iconColor="text-purple-500"
-              />
+              {isLoading ? (
+                // Loading skeletons
+                Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="metric-card">
+                    <Skeleton className="h-20 w-full" />
+                  </div>
+                ))
+              ) : error ? (
+                // Error state
+                <div className="col-span-4 text-center text-red-600">
+                  Error loading dashboard metrics. Please try again.
+                </div>
+              ) : (
+                // Real data
+                <>
+                  <MetricCard
+                    title="Total properties"
+                    value={metrics?.totalProperties.toString() || "0"}
+                    change={getPercentageChange(metrics?.totalProperties || 0, 'totalProperties')}
+                    changeType={getChangeType(getPercentageChange(metrics?.totalProperties || 0, 'totalProperties'))}
+                    icon={Home}
+                    iconColor="text-landify-blue"
+                  />
+                  <MetricCard
+                    title="Properties for sale"
+                    value={metrics?.propertiesForSale.toString() || "0"}
+                    change={getPercentageChange(metrics?.propertiesForSale || 0, 'propertiesForSale')}
+                    changeType={getChangeType(getPercentageChange(metrics?.propertiesForSale || 0, 'propertiesForSale'))}
+                    icon={Building}
+                    iconColor="text-green-500"
+                  />
+                  <MetricCard
+                    title="Properties for rent"
+                    value={metrics?.propertiesForRent.toString() || "0"}
+                    change={getPercentageChange(metrics?.propertiesForRent || 0, 'propertiesForRent')}
+                    changeType={getChangeType(getPercentageChange(metrics?.propertiesForRent || 0, 'propertiesForRent'))}
+                    icon={Building}
+                    iconColor="text-blue-500"
+                  />
+                  <MetricCard
+                    title="New leads"
+                    value={metrics?.newLeads.toString() || "0"}
+                    change={getPercentageChange(metrics?.newLeads || 0, 'newLeads')}
+                    changeType={getChangeType(getPercentageChange(metrics?.newLeads || 0, 'newLeads'))}
+                    icon={Users}
+                    iconColor="text-purple-500"
+                  />
+                </>
+              )}
             </div>
 
             {/* Charts and Tables Row */}
